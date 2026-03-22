@@ -1,178 +1,222 @@
 # 🔍 upstream-alert
 
-**Supply chain risk monitoring engine** — CLI tool + AI Agent Skill (OpenClaw / Claude Code / Gemini)
+> **Give your AI agent eyes on the global supply chain.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![PyPI](https://img.shields.io/pypi/v/upstream-alert.svg)](https://pypi.org/project/upstream-alert/)
 
-Monitor supply chain risks by aggregating data from **6 global sources**, scoring risk (0-100), and generating AI-powered analysis.
+**upstream-alert** is an AI agent skill that monitors supply chain risks in real-time. It aggregates data from **6 global sources**, scores risk (0–100), and generates AI-powered analysis — all callable as a single tool by your agent.
+
+```
+User → "Is it safe to order coffee beans from Brazil right now?"
+
+Agent → [calls upstream-alert]
+     → 🟡 Coffee Beans (BR) — Score: 52/100 [MEDIUM]
+       📊 CPI pressure moderate at 4.2% YoY.
+       🚢 Freight rates down 3.1% — favorable for importers.
+       📰 2 disruption signals detected in GDELT news feed.
+       💡 Recommendation: Proceed with caution, consider hedging.
+```
+
+## 🤖 Why Agents Need This
+
+Traditional supply chain monitoring requires humans to check dashboards, read news, and cross-reference data. **upstream-alert** packages all of this into a single function call that any AI agent can invoke.
+
+```mermaid
+graph LR
+    A[🤖 AI Agent] -->|"check_risk('coffee', 'BR')"| B[upstream-alert]
+    B --> C[FRED API]
+    B --> D[GDELT News]
+    B --> E[UN Comtrade]
+    B --> F[World Bank]
+    B --> G[Freightos FBX]
+    B --> H[NewsData.io]
+    C & D & E & F & G & H --> I[Risk Engine]
+    I -->|Score + Analysis| J[Gemini AI]
+    J -->|Structured Response| A
+```
+
+**What your agent gets back:**
+- 📊 **Risk score** (0–100) with severity level
+- 📈 **Market pulse** — CPI, freight rates, trade volumes
+- 📰 **News signals** — disruption events from global feeds
+- 💡 **AI analysis** — context-aware summary & recommendations
+- 📡 **Source attribution** — which data sources contributed
 
 ## ⚡ Quick Start
 
-```bash
-pip install upstream-alert
+### As an AI Agent Skill (Recommended)
 
-# Set at least one key (Gemini for AI analysis)
-export GEMINI_API_KEY="your_key"
+<details>
+<summary><b>OpenClaw</b> — one command install</summary>
 
-# Check risk
-upstream-alert check "咖啡豆" --country TW
-```
-
-Output:
-```
-🔍 Checking risk for '咖啡豆' (TW)...
-
-🟡 咖啡豆 (TW) — Score: 45/100 [MEDIUM]
-
-📊 Analysis:
-  Current CPI pressure is moderate at 2.1% YoY...
-
-📈 Market Pulse:
-  🚢 Freight: 2150 (↓1.5%)
-  📊 CPI: +2.1% YoY
-
-📡 Sources: fred, gdelt, fbx
-```
-
-## 📡 Data Sources
-
-| Source | Key | Free Tier | Data | Get Key |
-|--------|-----|-----------|------|---------|
-| **FRED** | `FRED_API_KEY` | 120 req/min | CPI, PPI | [申請](https://fred.stlouisfed.org/docs/api/api_key.html) |
-| **UN Comtrade** | `COMTRADE_API_KEY` | 500 req/day | Trade volumes | [申請](https://comtradeplus.un.org/) |
-| **NewsData.io** | `NEWSDATA_API_KEY` | 200 req/day | News + sentiment | [申請](https://newsdata.io/register) |
-| **Gemini AI** | `GEMINI_API_KEY` | 15 RPM | AI analysis | [申請](https://aistudio.google.com/apikey) |
-| **GDELT** | None ✅ | Unlimited | Global news | — |
-| **World Bank** | None ✅ | Unlimited | Economic indicators | — |
-| **Freightos FBX** | `FBX_API_KEY` | Paid ($119/mo) | Freight rates | [申請](https://terminal.freightos.com/fbx-api/) |
-
-> 💡 GDELT and World Bank work without any key. Start with just `GEMINI_API_KEY` for a basic setup.
-
-## 🛠 Usage
-
-### CLI
-
-```bash
-# Risk check (human-readable)
-upstream-alert check "semiconductor" --country US
-
-# Risk check (JSON)
-upstream-alert check "rice" --country JP -j
-
-# Market pulse
-upstream-alert pulse --country TW
-
-# Show configured sources
-upstream-alert sources
-```
-
-### Python API
-
-```python
-from upstream_alert import check_risk, RiskEngine
-
-# One-liner
-result = check_risk("coffee", country="US")
-print(result.score)       # 45
-print(result.level)       # RiskLevel.MEDIUM
-print(result.ai_summary)  # "Current CPI pressure..."
-
-# Full control
-engine = RiskEngine(
-    fred_key="your_key",
-    gemini_key="your_key",
-)
-result = engine.check("半導體", country="TW")
-```
-
-### AI Agent Skill
-
-Works with **OpenClaw**, **Claude Code**, and **Gemini CLI**:
-
-```
-User: What's the supply chain risk for coffee beans in Taiwan?
-
-Agent: [uses upstream-alert skill]
-       🟡 咖啡豆 (TW) — Score: 45/100 [MEDIUM]
-       
-       📊 Analysis:
-       CPI pressure is moderate. Global freight rates are
-       trending down (-1.5%), which is favorable for importers...
-```
-
-## 🔌 Install as AI Skill
-
-### OpenClaw
 ```bash
 claw skill install upstream-alert
 ```
 
-### Claude Code
+Then just ask your agent:
+```
+"What's the supply chain risk for semiconductors in Taiwan?"
+```
+</details>
+
+<details>
+<summary><b>Claude Code</b></summary>
+
 ```bash
-# Copy to skills directory
+pip install upstream-alert
 cp -r skills/claude-code ~/.claude/skills/upstream-alert
-pip install upstream-alert
+export GEMINI_API_KEY="your_key"
 ```
+</details>
 
-### Gemini CLI
+<details>
+<summary><b>Gemini CLI</b></summary>
+
 ```bash
-cp -r skills/gemini ~/.gemini/antigravity/skills/upstream-alert
 pip install upstream-alert
+cp -r skills/gemini ~/.gemini/antigravity/skills/upstream-alert
+export GEMINI_API_KEY="your_key"
+```
+</details>
+
+### As a Python Library
+
+```python
+from upstream_alert import check_risk
+
+result = check_risk("coffee", country="BR")
+print(result.score)       # 52
+print(result.level)       # RiskLevel.MEDIUM
+print(result.ai_summary)  # "CPI pressure moderate at 4.2%..."
+print(result.sources)     # ['fred', 'gdelt', 'fbx']
 ```
 
-## 📊 How Risk Scoring Works
+### As a CLI Tool
 
-The engine calculates a composite score (0-100) from four components:
+```bash
+pip install upstream-alert
+export GEMINI_API_KEY="your_key"
 
-| Factor | Weight | Signals |
-|--------|--------|---------|
-| CPI pressure | 30% | YoY inflation rate |
-| News sentiment | 30% | Negative news ratio |
-| Freight trends | 20% | FBX index change |
-| Trade uncertainty | 20% | Volume data availability |
+upstream-alert check "semiconductor" --country TW
+upstream-alert check "rice" --country JP -j    # JSON output
+upstream-alert pulse --country US              # Market overview
+upstream-alert sources                          # Show configured sources
+```
 
-**Risk Levels:**
-- 🟢 **Low** (0-39): Stable conditions
-- 🟡 **Medium** (40-59): Monitor closely
-- 🟠 **High** (60-79): Take action
-- 🔴 **Critical** (80-100): Immediate attention needed
+## 🔌 Agent Integration Patterns
 
-## 🤖 AI Agent Skills
+### Function Calling / Tool Use
 
-Pre-built skills for popular AI coding agents are included in the `skills/` directory.
+```python
+# Define as a tool for any LLM framework
+tool_definition = {
+    "name": "check_supply_chain_risk",
+    "description": "Check supply chain risk for a commodity in a specific country",
+    "parameters": {
+        "item": {"type": "string", "description": "Commodity name (e.g., 'coffee', '半導體')"},
+        "country": {"type": "string", "description": "ISO country code (e.g., 'US', 'TW', 'BR')"}
+    }
+}
 
-| Agent | Install Path | Copy Command |
-|-------|-------------|--------------|
-| OpenClaw | `~/.openclaw/workspace/skills/upstream-alert/` | `cp -r skills/openclaw ~/.openclaw/workspace/skills/upstream-alert` |
-| Claude Code | `.claude/skills/upstream-alert/` | `cp -r skills/claude-code .claude/skills/upstream-alert` |
-| Gemini CLI | `.gemini/skills/upstream-alert/` | `cp -r skills/gemini .gemini/skills/upstream-alert` |
+# Implementation
+from upstream_alert import check_risk
 
-Each skill needs only `GEMINI_API_KEY` set to start. See the individual `SKILL.md` files for full configuration.
+def check_supply_chain_risk(item: str, country: str) -> dict:
+    result = check_risk(item, country=country)
+    return {
+        "score": result.score,
+        "level": result.level.value,
+        "summary": result.ai_summary,
+        "market_pulse": result.market_pulse,
+        "sources": result.sources,
+    }
+```
+
+### MCP Server (Coming Soon)
+
+```python
+# upstream-alert as an MCP tool server
+# Stay tuned — MCP integration is on the roadmap
+```
+
+### Multi-Agent Workflow
+
+```python
+from upstream_alert import RiskEngine
+
+# Shared engine for a team of agents
+engine = RiskEngine(
+    fred_key="...",
+    gemini_key="...",
+)
+
+# Procurement agent checks before ordering
+risk = engine.check("steel", country="CN")
+if risk.score > 60:
+    # Escalate to human or trigger alternative sourcing
+    notify_procurement_team(risk)
+```
+
+## 📡 Data Sources
+
+| Source | Key Required | Free Tier | Data |
+|--------|:---:|-----------|------|
+| **GDELT** | ❌ | Unlimited | Global news events |
+| **World Bank** | ❌ | Unlimited | Economic indicators |
+| **FRED** | `FRED_API_KEY` | 120 req/min | CPI, PPI |
+| **UN Comtrade** | `COMTRADE_API_KEY` | 500 req/day | Trade volumes |
+| **NewsData.io** | `NEWSDATA_API_KEY` | 200 req/day | News + sentiment |
+| **Gemini AI** | `GEMINI_API_KEY` | 15 RPM | AI analysis |
+| **Freightos FBX** | `FBX_API_KEY` | Paid | Freight rates |
+
+> 💡 **Zero-key start:** GDELT + World Bank work without any API key. Add `GEMINI_API_KEY` for AI-powered analysis.
+
+## 📊 Risk Scoring
+
+The engine calculates a composite score (0–100) from four weighted signals:
+
+```
+Risk Score = (CPI × 0.30) + (News × 0.30) + (Freight × 0.20) + (Trade × 0.20)
+```
+
+| Level | Score | Action |
+|-------|-------|--------|
+| 🟢 Low | 0–39 | Stable — no action needed |
+| 🟡 Medium | 40–59 | Monitor — review before large orders |
+| 🟠 High | 60–79 | Act — consider alternative sourcing |
+| 🔴 Critical | 80–100 | Escalate — immediate attention required |
 
 ## 🏗 Architecture
 
 ```
-upstream-alert
-├── sources/          ← Data source adapters (pure HTTP)
-│   ├── fred.py       ← CPI/PPI from FRED
-│   ├── gdelt.py      ← News from GDELT (free)
-│   ├── comtrade.py   ← Trade data from UN
-│   ├── worldbank.py  ← Indicators from World Bank (free)
-│   ├── newsdata.py   ← News from NewsData.io
-│   └── fbx.py        ← Freight from Freightos
-├── engine.py         ← RiskEngine (orchestration + scoring)
-├── analyzer.py       ← Gemini AI analysis wrapper
-├── models.py         ← Pydantic data models
-└── cli.py            ← Click CLI
+upstream-alert/
+├── src/upstream_alert/
+│   ├── engine.py         ← Orchestration + scoring
+│   ├── analyzer.py       ← Gemini AI analysis
+│   ├── models.py         ← Pydantic response models
+│   ├── cli.py            ← Click CLI interface
+│   └── sources/          ← Pluggable data adapters
+│       ├── fred.py       ← CPI/PPI (FRED)
+│       ├── gdelt.py      ← News events (GDELT)
+│       ├── comtrade.py   ← Trade data (UN)
+│       ├── worldbank.py  ← Economic indicators
+│       ├── newsdata.py   ← News sentiment
+│       └── fbx.py        ← Freight rates (Freightos)
+├── skills/               ← Pre-built AI agent skills
+│   ├── openclaw/         ← OpenClaw skill package
+│   ├── claude-code/      ← Claude Code skill
+│   └── gemini/           ← Gemini CLI skill
+└── tests/                ← 155+ test cases
 ```
 
-**Design principles:**
-- 🚫 No Firebase / cloud dependency
-- 🔑 Bring Your Own Keys (BYOK)
-- 📦 Zero special system dependencies
-- 🎯 Stateless — no database needed
+**Design Principles:**
+- 🤖 **Agent-first** — designed as a tool for AI agents, not just humans
+- 🔑 **BYOK** — bring your own API keys, no vendor lock-in
+- 🚫 **No infrastructure** — no database, no cloud services required
+- 📦 **Zero dependencies** on system packages — pure Python + HTTP
+- 🎯 **Stateless** — every call is independent, perfect for serverless
 
 ## 🤝 Contributing
 
@@ -180,7 +224,7 @@ upstream-alert
 git clone https://github.com/ImL1s/upstream-alert
 cd upstream-alert
 pip install -e ".[dev]"
-pytest
+pytest  # 155+ tests
 ```
 
 ## 📄 License
