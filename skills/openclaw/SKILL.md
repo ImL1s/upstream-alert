@@ -18,7 +18,7 @@ metadata:
         - GEMINI_API_KEY
     install:
       - id: "upstream-alert-pip"
-        kind: "uv"
+        kind: "pip"
         package: "upstream-alert"
         bins: ["upstream-alert"]
         label: "Install upstream-alert (pip)"

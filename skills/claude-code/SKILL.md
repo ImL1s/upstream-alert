@@ -6,6 +6,8 @@ description: >
   World Bank, NewsData, and Gemini AI. Bring your own API keys (free tiers available).
   Trigger keywords: supply chain, risk, CPI, freight, import, export, trade, commodity,
   price trend, supply disruption, shipping cost, inflation, economic indicator.
+dependencies:
+  - upstream-alert
 ---
 
 # upstream-alert — Supply Chain Risk Monitor

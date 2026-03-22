@@ -139,6 +139,18 @@ The engine calculates a composite score (0-100) from four components:
 - 🟠 **High** (60-79): Take action
 - 🔴 **Critical** (80-100): Immediate attention needed
 
+## 🤖 AI Agent Skills
+
+Pre-built skills for popular AI coding agents are included in the `skills/` directory.
+
+| Agent | Install Path | Copy Command |
+|-------|-------------|--------------|
+| OpenClaw | `~/.openclaw/workspace/skills/upstream-alert/` | `cp -r skills/openclaw ~/.openclaw/workspace/skills/upstream-alert` |
+| Claude Code | `.claude/skills/upstream-alert/` | `cp -r skills/claude-code .claude/skills/upstream-alert` |
+| Gemini CLI | `.gemini/skills/upstream-alert/` | `cp -r skills/gemini .gemini/skills/upstream-alert` |
+
+Each skill needs only `GEMINI_API_KEY` set to start. See the individual `SKILL.md` files for full configuration.
+
 ## 🏗 Architecture
 
 ```
