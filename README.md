@@ -89,8 +89,8 @@ from upstream_alert import check_risk
 result = check_risk("coffee", country="BR")
 print(result.score)       # 52
 print(result.level)       # RiskLevel.MEDIUM
-print(result.ai_summary)  # "CPI pressure moderate at 4.2%..."
-print(result.sources)     # ['fred', 'gdelt', 'fbx']
+print(result.ai_summary)    # "CPI pressure moderate at 4.2%..."
+print(result.sources_used)  # ['fred', 'gdelt', 'fbx']
 ```
 
 ### As a CLI Tool
@@ -129,17 +129,12 @@ def check_supply_chain_risk(item: str, country: str) -> dict:
         "score": result.score,
         "level": result.level.value,
         "summary": result.ai_summary,
-        "market_pulse": result.market_pulse,
-        "sources": result.sources,
+        "market_pulse": result.market_pulse.model_dump() if result.market_pulse else None,
+        "sources": result.sources_used,
     }
 ```
 
-### MCP Server (Coming Soon)
-
-```python
-# upstream-alert as an MCP tool server
-# Stay tuned — MCP integration is on the roadmap
-```
+> 🚧 **MCP Server** — native MCP tool server integration is on the roadmap.
 
 ### Multi-Agent Workflow
 
@@ -156,20 +151,20 @@ engine = RiskEngine(
 risk = engine.check("steel", country="CN")
 if risk.score > 60:
     # Escalate to human or trigger alternative sourcing
-    notify_procurement_team(risk)
+    notify_procurement_team(risk)  # your custom function
 ```
 
 ## 📡 Data Sources
 
-| Source | Key Required | Free Tier | Data |
-|--------|:---:|-----------|------|
-| **GDELT** | ❌ | Unlimited | Global news events |
-| **World Bank** | ❌ | Unlimited | Economic indicators |
-| **FRED** | `FRED_API_KEY` | 120 req/min | CPI, PPI |
-| **UN Comtrade** | `COMTRADE_API_KEY` | 500 req/day | Trade volumes |
-| **NewsData.io** | `NEWSDATA_API_KEY` | 200 req/day | News + sentiment |
-| **Gemini AI** | `GEMINI_API_KEY` | 15 RPM | AI analysis |
-| **Freightos FBX** | `FBX_API_KEY` | Paid | Freight rates |
+| Source | Key Required | Free Tier | Data | Get Key |
+|--------|:---:|-----------|------|:---:|
+| **GDELT** | ❌ | Unlimited | Global news events | — |
+| **World Bank** | ❌ | Unlimited | Economic indicators | — |
+| **FRED** | `FRED_API_KEY` | 120 req/min | CPI, PPI | [申請](https://fred.stlouisfed.org/docs/api/api_key.html) |
+| **UN Comtrade** | `COMTRADE_API_KEY` | 500 req/day | Trade volumes | [申請](https://comtradeplus.un.org/) |
+| **NewsData.io** | `NEWSDATA_API_KEY` | 200 req/day | News + sentiment | [申請](https://newsdata.io/register) |
+| **Gemini AI** | `GEMINI_API_KEY` | 15 RPM | AI analysis | [申請](https://aistudio.google.com/apikey) |
+| **Freightos FBX** | `FBX_API_KEY` | Paid | Freight rates | [申請](https://terminal.freightos.com/fbx-api/) |
 
 > 💡 **Zero-key start:** GDELT + World Bank work without any API key. Add `GEMINI_API_KEY` for AI-powered analysis.
 
