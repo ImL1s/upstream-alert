@@ -38,15 +38,15 @@ Output:
 
 ## 📡 Data Sources
 
-| Source | Key | Free Tier | Data |
-|--------|-----|-----------|------|
-| **FRED** | `FRED_API_KEY` | 120 req/min | CPI, PPI |
-| **UN Comtrade** | `COMTRADE_API_KEY` | 500 req/day | Trade volumes |
-| **NewsData.io** | `NEWSDATA_API_KEY` | 200 req/day | News + sentiment |
-| **Gemini AI** | `GEMINI_API_KEY` | 15 RPM | AI analysis |
-| **GDELT** | None ✅ | Unlimited | Global news |
-| **World Bank** | None ✅ | Unlimited | Economic indicators |
-| **Freightos FBX** | `FBX_API_KEY` | Paid ($119/mo) | Freight rates |
+| Source | Key | Free Tier | Data | Get Key |
+|--------|-----|-----------|------|---------|
+| **FRED** | `FRED_API_KEY` | 120 req/min | CPI, PPI | [申請](https://fred.stlouisfed.org/docs/api/api_key.html) |
+| **UN Comtrade** | `COMTRADE_API_KEY` | 500 req/day | Trade volumes | [申請](https://comtradeplus.un.org/) |
+| **NewsData.io** | `NEWSDATA_API_KEY` | 200 req/day | News + sentiment | [申請](https://newsdata.io/register) |
+| **Gemini AI** | `GEMINI_API_KEY` | 15 RPM | AI analysis | [申請](https://aistudio.google.com/apikey) |
+| **GDELT** | None ✅ | Unlimited | Global news | — |
+| **World Bank** | None ✅ | Unlimited | Economic indicators | — |
+| **Freightos FBX** | `FBX_API_KEY` | Paid ($119/mo) | Freight rates | [申請](https://terminal.freightos.com/fbx-api/) |
 
 > 💡 GDELT and World Bank work without any key. Start with just `GEMINI_API_KEY` for a basic setup.
 
