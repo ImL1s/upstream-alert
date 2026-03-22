@@ -1,0 +1,50 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "upstream-alert"
+version = "0.1.0"
+description = "Supply chain risk monitoring engine — CLI + AI Agent Skill"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "ImL1s" },
+]
+keywords = ["supply-chain", "risk", "monitoring", "AI", "agent", "skill"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Office/Business",
+]
+dependencies = [
+    "requests>=2.28",
+    "pydantic>=2.0",
+    "click>=8.0",
+    "google-genai>=1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov",
+    "ruff",
+    "responses",  # HTTP mocking
+]
+
+[project.scripts]
+upstream-alert = "upstream_alert.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/ImL1s/upstream-alert"
+Issues = "https://github.com/ImL1s/upstream-alert/issues"
+
+[tool.ruff]
+target-version = "py310"
+line-length = 88
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
