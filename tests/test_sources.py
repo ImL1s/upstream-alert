@@ -359,3 +359,396 @@ class TestComtrade:
         assert "coffee" in comtrade.HS_CODES
         assert comtrade.HS_CODES["coffee"] == "0901"
         assert "semiconductors" in comtrade.HS_CODES
+
+    @responses.activate
+    def test_fetch_trade_data_empty_data_array(self):
+        """API returns 200 with empty data array → empty list, no crash."""
+        responses.add(
+            responses.GET,
+            "https://comtradeapi.un.org/data/v1/get/C/A/HS",
+            json={"data": []},
+            status=200,
+        )
+        from upstream_alert.sources import comtrade
+
+        records = comtrade.fetch_trade_data("key", "JP", "0901")
+        assert records == []
+
+    @responses.activate
+    def test_fetch_trade_data_timeout(self):
+        """Connection timeout → empty list, not exception."""
+        import requests as req
+
+        responses.add(
+            responses.GET,
+            "https://comtradeapi.un.org/data/v1/get/C/A/HS",
+            body=req.exceptions.ConnectionError("timeout"),
+        )
+        from upstream_alert.sources import comtrade
+
+        records = comtrade.fetch_trade_data("key", "US", "0901")
+        assert records == []
+
+    def test_to_signals_missing_fields(self):
+        """Records with missing optional fields should use defaults."""
+        from upstream_alert.sources import comtrade
+
+        records = [{"flowCode": "M"}]  # minimal record, most fields missing
+        signals = comtrade.to_signals(records)
+        assert len(signals) == 1
+        assert signals[0].reporter == ""
+        assert signals[0].commodity == ""
+        assert signals[0].value_usd == 0
+        assert signals[0].quantity == 0
+
+    def test_to_signals_null_values(self):
+        """primaryValue and qty can be None from API → should default to 0."""
+        from upstream_alert.sources import comtrade
+
+        records = [{"flowCode": "X", "primaryValue": None, "qty": None}]
+        signals = comtrade.to_signals(records)
+        assert signals[0].value_usd == 0
+        assert signals[0].quantity == 0
+
+    @responses.activate
+    def test_fetch_trade_data_malformed_json(self):
+        """Non-JSON 200 response → empty list."""
+        responses.add(
+            responses.GET,
+            "https://comtradeapi.un.org/data/v1/get/C/A/HS",
+            body="NOT JSON AT ALL",
+            status=200,
+            content_type="text/html",
+        )
+        from upstream_alert.sources import comtrade
+
+        records = comtrade.fetch_trade_data("key", "JP", "0901")
+        assert records == []
+
+
+# ── Edge Cases: FRED ──
+
+
+class TestFredEdgeCases:
+    @responses.activate
+    def test_timeout_returns_empty(self):
+        """Connection error → empty list."""
+        import requests as req
+
+        responses.add(
+            responses.GET,
+            "https://api.stlouisfed.org/fred/series/observations",
+            body=req.exceptions.Timeout("read timed out"),
+        )
+        from upstream_alert.sources import fred
+
+        records = fred.fetch_observations("key", "CPIAUCSL")
+        assert records == []
+
+    @responses.activate
+    def test_malformed_json_response(self):
+        """Non-JSON 200 → empty list."""
+        responses.add(
+            responses.GET,
+            "https://api.stlouisfed.org/fred/series/observations",
+            body="<html>Error</html>",
+            status=200,
+            content_type="text/html",
+        )
+        from upstream_alert.sources import fred
+
+        records = fred.fetch_observations("key", "X")
+        assert records == []
+
+    @responses.activate
+    def test_non_numeric_value_skipped(self):
+        """Values that can't be parsed as float should be skipped."""
+        responses.add(
+            responses.GET,
+            "https://api.stlouisfed.org/fred/series/observations",
+            json={"observations": [
+                {"date": "2026-01-01", "value": "not_a_number"},
+                {"date": "2025-12-01", "value": "100.0"},
+            ]},
+            status=200,
+        )
+        from upstream_alert.sources import fred
+
+        records = fred.fetch_observations("key", "X", limit=2)
+        assert len(records) == 1
+        assert records[0]["value"] == 100.0
+
+    def test_to_signals_empty_records(self):
+        """Empty records list → empty signals list."""
+        from upstream_alert.sources import fred
+
+        signals = fred.to_signals([])
+        assert signals == []
+
+    @responses.activate
+    def test_get_latest_cpi_change_no_data(self):
+        """If FRED returns no observations, should return 0.0."""
+        responses.add(
+            responses.GET,
+            "https://api.stlouisfed.org/fred/series/observations",
+            json={"observations": []},
+            status=200,
+        )
+        from upstream_alert.sources import fred
+
+        result = fred.get_latest_cpi_change("key", "CPIAUCSL")
+        assert result == 0.0
+
+    @responses.activate
+    def test_get_latest_cpi_index_insufficient_data(self):
+        """Less than 13 records for index series → 0.0."""
+        responses.add(
+            responses.GET,
+            "https://api.stlouisfed.org/fred/series/observations",
+            json={"observations": [
+                {"date": "2026-01-01", "value": "100.0"},
+            ]},
+            status=200,
+        )
+        from upstream_alert.sources import fred
+
+        result = fred.get_latest_cpi_change("key", "CPIAUCSL")
+        assert result == 0.0
+
+
+# ── Edge Cases: GDELT ──
+
+
+class TestGdeltEdgeCases:
+    @responses.activate
+    def test_empty_articles_array(self):
+        """articles key present but empty → empty list."""
+        responses.add(
+            responses.GET,
+            "https://api.gdeltproject.org/api/v2/doc/doc",
+            json={"articles": []},
+            status=200,
+        )
+        from upstream_alert.sources import gdelt
+
+        articles = gdelt.search_articles("coffee")
+        assert articles == []
+
+    @responses.activate
+    def test_network_error(self):
+        """Connection error → empty list, not crash."""
+        import requests as req
+
+        responses.add(
+            responses.GET,
+            "https://api.gdeltproject.org/api/v2/doc/doc",
+            body=req.exceptions.ConnectionError("DNS failed"),
+        )
+        from upstream_alert.sources import gdelt
+
+        articles = gdelt.search_articles("anything")
+        assert articles == []
+
+    def test_to_signals_missing_tone(self):
+        """Article without tone field → sentiment 0.0."""
+        from upstream_alert.sources import gdelt
+
+        articles = [{"title": "Test", "url": "http://x", "domain": "x.com"}]
+        signals = gdelt.to_signals(articles)
+        assert signals[0].sentiment == 0.0
+
+    def test_to_signals_empty_tone_string(self):
+        """Empty tone string → 0.0."""
+        from upstream_alert.sources import gdelt
+
+        articles = [{"title": "Test", "tone": "", "url": "http://x"}]
+        signals = gdelt.to_signals(articles)
+        assert signals[0].sentiment == 0.0
+
+    def test_to_signals_invalid_tone(self):
+        """Non-numeric tone → 0.0."""
+        from upstream_alert.sources import gdelt
+
+        articles = [{"title": "Test", "tone": "invalid", "url": "http://x"}]
+        signals = gdelt.to_signals(articles)
+        assert signals[0].sentiment == 0.0
+
+
+# ── Edge Cases: World Bank ──
+
+
+class TestWorldBankEdgeCases:
+    @responses.activate
+    def test_network_error(self):
+        """Connection error → empty list."""
+        import requests as req
+
+        responses.add(
+            responses.GET,
+            "https://api.worldbank.org/v2/country/USA/indicator/FP.CPI.TOTL.ZG",
+            body=req.exceptions.ConnectionError("timeout"),
+        )
+        from upstream_alert.sources import worldbank
+
+        records = worldbank.fetch_indicator("US", "cpi")
+        assert records == []
+
+    @responses.activate
+    def test_null_values_skipped(self):
+        """Entries with value=null are skipped."""
+        responses.add(
+            responses.GET,
+            "https://api.worldbank.org/v2/country/JPN/indicator/FP.CPI.TOTL.ZG",
+            json=[
+                {"page": 1, "total": 2},
+                [
+                    {"date": "2025", "value": None, "country": {"id": "JPN"}},
+                    {"date": "2024", "value": 2.1, "country": {"id": "JPN"}},
+                ],
+            ],
+            status=200,
+        )
+        from upstream_alert.sources import worldbank
+
+        records = worldbank.fetch_indicator("JP", "cpi")
+        assert len(records) == 1
+        assert records[0]["value"] == 2.1
+
+    @responses.activate
+    def test_malformed_json_response(self):
+        """Non-list response → empty list."""
+        responses.add(
+            responses.GET,
+            "https://api.worldbank.org/v2/country/USA/indicator/FP.CPI.TOTL.ZG",
+            json={"error": "something broke"},
+            status=200,
+        )
+        from upstream_alert.sources import worldbank
+
+        records = worldbank.fetch_indicator("US", "cpi")
+        assert records == []
+
+    @responses.activate
+    def test_get_latest_cpi_no_data(self):
+        """No data → 0.0."""
+        responses.add(
+            responses.GET,
+            "https://api.worldbank.org/v2/country/TWN/indicator/FP.CPI.TOTL.ZG",
+            json=[{"page": 1, "total": 0}, None],
+            status=200,
+        )
+        from upstream_alert.sources import worldbank
+
+        result = worldbank.get_latest_cpi("TW")
+        assert result == 0.0
+
+    def test_to_signals_empty(self):
+        from upstream_alert.sources import worldbank
+
+        signals = worldbank.to_signals([])
+        assert signals == []
+
+
+# ── Edge Cases: NewsData ──
+
+
+class TestNewsDataEdgeCases:
+    @responses.activate
+    def test_api_error_returns_empty(self):
+        """HTTP error → empty list, not crash."""
+        responses.add(
+            responses.GET,
+            "https://newsdata.io/api/1/latest",
+            status=403,
+        )
+        from upstream_alert.sources import newsdata
+
+        articles = newsdata.search_news("key", "coffee")
+        assert articles == []
+
+    @responses.activate
+    def test_timeout_returns_empty(self):
+        """Connection timeout → empty list."""
+        import requests as req
+
+        responses.add(
+            responses.GET,
+            "https://newsdata.io/api/1/latest",
+            body=req.exceptions.Timeout("read timed out"),
+        )
+        from upstream_alert.sources import newsdata
+
+        articles = newsdata.search_news("key", "coffee")
+        assert articles == []
+
+    @responses.activate
+    def test_search_supply_chain_builds_query(self):
+        """Convenience function combines 'supply chain' + item name."""
+        responses.add(
+            responses.GET,
+            "https://newsdata.io/api/1/latest",
+            json={"results": [{"title": "Match"}]},
+            status=200,
+        )
+        from upstream_alert.sources import newsdata
+
+        articles = newsdata.search_supply_chain("key", item_name="coffee")
+        assert len(articles) == 1
+        # Verify the query was built correctly
+        assert "supply+chain" in responses.calls[0].request.url or \
+               "supply%20chain" in responses.calls[0].request.url
+
+    def test_to_signals_unknown_sentiment_string(self):
+        """Unknown sentiment string → 0.0."""
+        from upstream_alert.sources import newsdata
+
+        articles = [{"title": "X", "sentiment": "ambiguous"}]
+        signals = newsdata.to_signals(articles)
+        assert signals[0].sentiment == 0.0
+
+    def test_to_signals_missing_all_fields(self):
+        """Article with no fields → uses defaults."""
+        from upstream_alert.sources import newsdata
+
+        articles = [{}]
+        signals = newsdata.to_signals(articles)
+        assert len(signals) == 1
+        assert signals[0].title == ""
+        assert signals[0].url == ""
+        assert signals[0].sentiment == 0.0
+
+
+# ── Edge Cases: FBX ──
+
+
+class TestFbxEdgeCases:
+    @responses.activate
+    def test_timeout_falls_back_to_mock(self):
+        """Connection timeout → mock data."""
+        import requests as req
+
+        responses.add(
+            responses.GET,
+            "https://fbx.freightos.com/api/v1/index/global",
+            body=req.exceptions.Timeout("connect timed out"),
+        )
+        from upstream_alert.sources import fbx
+
+        signal = fbx.fetch_global_index(api_key="key")
+        assert signal.source == "mock"
+
+    @responses.activate
+    def test_api_returns_partial_data(self):
+        """API returns JSON missing some fields → defaults used."""
+        responses.add(
+            responses.GET,
+            "https://fbx.freightos.com/api/v1/index/global",
+            json={"index": 4000},  # missing change_pct, date
+            status=200,
+        )
+        from upstream_alert.sources import fbx
+
+        signal = fbx.fetch_global_index(api_key="key")
+        assert signal.source == "fbx"
+        assert signal.index == 4000
+        assert signal.change_pct == 0  # default from get()

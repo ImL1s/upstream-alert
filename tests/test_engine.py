@@ -298,3 +298,169 @@ class TestCheckRiskConvenience:
         assert isinstance(result, RiskResult)
         assert result.item == "tea"
         assert result.country == "JP"
+
+
+# ── Edge Cases: Score Boundaries ──
+
+
+class TestScoreBoundaryExact:
+    """Test exact boundary values for CPI scoring thresholds."""
+
+    def _engine(self) -> RiskEngine:
+        return RiskEngine(
+            fred_key="", comtrade_key="", newsdata_key="",
+            gemini_key="", fbx_key="",
+        )
+
+    def test_cpi_exactly_5(self):
+        """CPI=5.0 is in the >3 bracket (20), not >5 bracket (30)."""
+        e = self._engine()
+        price = [{"yoy_change": 5.0}]
+        score = e._calculate_score(price, [], None, [])
+        # >3 but not >5 → 20; + 10 (no trade) = 30
+        assert score == 30
+
+    def test_cpi_exactly_3(self):
+        """CPI=3.0 is in the >2 bracket (10), not >3 bracket (20)."""
+        e = self._engine()
+        price = [{"yoy_change": 3.0}]
+        score = e._calculate_score(price, [], None, [])
+        # >2 but not >3 → 10; + 10 (no trade) = 20
+        assert score == 20
+
+    def test_cpi_exactly_2(self):
+        """CPI=2.0 is neither >2 nor <0 → 0 points from CPI."""
+        e = self._engine()
+        price = [{"yoy_change": 2.0}]
+        score = e._calculate_score(price, [], None, [])
+        # CPI=0 + 10 (no trade) = 10
+        assert score == 10
+
+    def test_cpi_exactly_0(self):
+        """CPI=0.0 → no CPI risk points."""
+        e = self._engine()
+        price = [{"yoy_change": 0.0}]
+        score = e._calculate_score(price, [], None, [])
+        assert score == 10  # just uncertainty
+
+    def test_all_news_negative(self):
+        """All news negative → capped at 30 + uncertainty = 40."""
+        e = self._engine()
+        news = [{"sentiment": -0.9} for _ in range(20)]
+        score = e._calculate_score([], news, None, [])
+        assert score == 40  # 30 + 10
+
+    def test_freight_moderate_change(self):
+        """freight 5 < change_pct <= 10 → +15."""
+        e = self._engine()
+        freight = FreightSignal(index=3000, change_pct=7.0, source="fbx")
+        score = e._calculate_score([], [], freight, [])
+        assert score == 25  # 15 + 10
+
+    def test_freight_small_positive_change(self):
+        """freight 0 < change_pct <= 5 → +5."""
+        e = self._engine()
+        freight = FreightSignal(index=3000, change_pct=3.0, source="fbx")
+        score = e._calculate_score([], [], freight, [])
+        assert score == 15  # 5 + 10
+
+    def test_freight_exactly_10(self):
+        """freight change_pct=10.0 is >5 bracket (15), not >10 bracket (20)."""
+        e = self._engine()
+        freight = FreightSignal(index=3000, change_pct=10.0, source="fbx")
+        score = e._calculate_score([], [], freight, [])
+        assert score == 25  # 15 + 10
+
+    def test_freight_negative_change(self):
+        """freight negative change → 0 freight points."""
+        e = self._engine()
+        freight = FreightSignal(index=3000, change_pct=-5.0, source="fbx")
+        score = e._calculate_score([], [], freight, [])
+        assert score == 10  # just uncertainty
+
+    def test_combined_max_score_without_trade(self):
+        """Max score: CPI>5(30) + all_neg_news(30) + freight>10(20) + no_trade(10) = 90."""
+        e = self._engine()
+        price = [{"yoy_change": 8.0}]
+        news = [{"sentiment": -0.9} for _ in range(10)]
+        freight = FreightSignal(index=9999, change_pct=15.0, source="fbx")
+        score = e._calculate_score(price, news, freight, [])
+        assert score == 90
+
+    def test_combined_max_score_with_trade(self):
+        """Max with trade data: 30 + 30 + 20 + 0 = 80."""
+        e = self._engine()
+        price = [{"yoy_change": 8.0}]
+        news = [{"sentiment": -0.9} for _ in range(10)]
+        freight = FreightSignal(index=9999, change_pct=15.0, source="fbx")
+        trade = [{"data": "present"}]
+        score = e._calculate_score(price, news, freight, trade)
+        assert score == 80
+
+
+# ── Edge Cases: Engine with partial source failures ──
+
+
+class TestEnginePartialSources:
+    """Test engine when some sources succeed and others fail."""
+
+    @patch("upstream_alert.analyzer.analyze_risk")
+    @patch("upstream_alert.sources.gdelt.search_articles")
+    @patch("upstream_alert.sources.fbx.fetch_global_index")
+    @patch("upstream_alert.sources.worldbank.fetch_indicator")
+    def test_worldbank_fails_gdelt_succeeds(
+        self, mock_wb, mock_fbx, mock_gdelt, mock_ai,
+    ):
+        """WB down, GDELT works → result has GDELT data + error."""
+        mock_wb.side_effect = Exception("WB API down")
+        mock_fbx.return_value = FreightSignal(index=2000, source="mock")
+        mock_gdelt.return_value = [
+            {"title": "Supply chain news", "url": "http://x",
+             "domain": "bbc.com", "tone": "-2.0", "seendate": "20260322"},
+        ]
+        mock_ai.return_value = "AI summary"
+
+        engine = RiskEngine()
+        result = engine.check("coffee", "JP")
+
+        assert isinstance(result, RiskResult)
+        assert any("World Bank" in e or "WB" in e for e in result.errors)
+        assert "gdelt" in result.sources_used
+
+    @patch("upstream_alert.analyzer.analyze_risk")
+    @patch("upstream_alert.sources.gdelt.search_articles")
+    @patch("upstream_alert.sources.fbx.fetch_global_index")
+    @patch("upstream_alert.sources.worldbank.fetch_indicator")
+    def test_fbx_exception_recorded(
+        self, mock_wb, mock_fbx, mock_gdelt, mock_ai,
+    ):
+        """FBX exception → error recorded, engine continues."""
+        mock_wb.return_value = []
+        mock_fbx.side_effect = Exception("FBX timeout")
+        mock_gdelt.return_value = []
+        mock_ai.return_value = "Summary"
+
+        engine = RiskEngine()
+        result = engine.check("tea", "US")
+
+        assert isinstance(result, RiskResult)
+        assert any("FBX" in e for e in result.errors)
+
+    @patch("upstream_alert.analyzer.analyze_risk")
+    @patch("upstream_alert.sources.gdelt.search_articles")
+    @patch("upstream_alert.sources.fbx.fetch_global_index")
+    @patch("upstream_alert.sources.worldbank.fetch_indicator")
+    def test_empty_item_name(
+        self, mock_wb, mock_fbx, mock_gdelt, mock_ai,
+    ):
+        """Empty item name → defaults to coffee HS code, no crash."""
+        mock_wb.return_value = []
+        mock_fbx.return_value = FreightSignal(index=1000, source="mock")
+        mock_gdelt.return_value = []
+        mock_ai.return_value = "Summary"
+
+        engine = RiskEngine()
+        result = engine.check("", "US")
+
+        assert isinstance(result, RiskResult)
+        assert result.item == ""

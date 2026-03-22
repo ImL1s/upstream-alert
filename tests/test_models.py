@@ -208,3 +208,143 @@ class TestRiskResult:
         assert "咖啡豆" in j
         parsed = json.loads(j)
         assert parsed["item"] == "咖啡豆"
+
+    def test_score_boundary_zero(self):
+        """Score=0 is valid."""
+        r = RiskResult(item="x", country="TW", score=0, level=RiskLevel.LOW)
+        assert r.score == 0
+
+    def test_score_boundary_hundred(self):
+        """Score=100 is valid."""
+        r = RiskResult(item="x", country="TW", score=100,
+                       level=RiskLevel.CRITICAL)
+        assert r.score == 100
+
+    def test_empty_strings(self):
+        """Empty item/country should still create valid result."""
+        r = RiskResult(item="", country="", score=50, level=RiskLevel.MEDIUM)
+        assert r.item == ""
+        assert r.country == ""
+        d = r.to_dict()
+        assert json.dumps(d)  # must not crash
+
+    def test_long_ai_summary(self):
+        """Very long AI summary should not cause issues."""
+        long_text = "A" * 10000
+        r = RiskResult(item="test", country="US", score=50,
+                       level=RiskLevel.MEDIUM, ai_summary=long_text)
+        d = r.to_dict()
+        assert len(d["ai_summary"]) == 10000
+
+    def test_fully_populated_json_roundtrip(self):
+        """All fields filled → JSON roundtrip succeeds."""
+        freight = FreightSignal(index=2500, change_pct=8.5,
+                                date="2026-03", source="fbx")
+        pulse = MarketPulse(
+            freight=freight, cpi_change=3.5,
+            trade_signals=[
+                TradeSignal(reporter="JPN", flow="M", commodity="Coffee",
+                            hs_code="0901", value_usd=100000, quantity=50,
+                            period="202601"),
+            ],
+        )
+        r = RiskResult(
+            item="coffee", country="JP", score=65,
+            level=RiskLevel.HIGH,
+            ai_summary="Risk analysis summary here.",
+            price_signals=[
+                PriceSignal(source="fred", period="2026-02",
+                            category="CPI", index_value=310, yoy_change=4.2),
+            ],
+            news_signals=[
+                NewsSignal(title="Supply disruption", url="http://x",
+                           sentiment=-0.6),
+            ],
+            market_pulse=pulse,
+            sources_used=["fred", "gdelt", "comtrade"],
+            errors=["newsdata: timeout"],
+        )
+        d = r.to_dict()
+        j = json.dumps(d, ensure_ascii=False)
+        parsed = json.loads(j)
+        assert parsed["score"] == 65
+        assert parsed["level"] == "high"
+        assert len(parsed["sources_used"]) == 3
+        assert len(parsed["errors"]) == 1
+
+
+# ── Edge Cases: PriceSignal ──
+
+
+class TestPriceSignalEdgeCases:
+    def test_extreme_yoy_change(self):
+        """Very large YoY change should be accepted."""
+        s = PriceSignal(source="test", period="2026", category="CPI",
+                        yoy_change=999.99)
+        assert s.yoy_change == 999.99
+
+    def test_negative_index_value(self):
+        """Negative index value (unusual but valid)."""
+        s = PriceSignal(source="test", period="2026", category="CPI",
+                        index_value=-5.0)
+        assert s.index_value == -5.0
+
+
+# ── Edge Cases: NewsSignal ──
+
+
+class TestNewsSignalEdgeCases:
+    def test_extreme_sentiment_values(self):
+        """Extreme sentiment values should be accepted by model."""
+        n1 = NewsSignal(title="Good", sentiment=1.0)
+        n2 = NewsSignal(title="Bad", sentiment=-1.0)
+        assert n1.sentiment == 1.0
+        assert n2.sentiment == -1.0
+
+    def test_long_title(self):
+        """Very long title should not crash."""
+        title = "Breaking News: " * 200
+        n = NewsSignal(title=title)
+        assert len(n.title) > 1000
+
+
+# ── Edge Cases: TradeSignal ──
+
+
+class TestTradeSignalEdgeCases:
+    def test_zero_values(self):
+        """Zero trade values should be valid."""
+        t = TradeSignal(reporter="USA", flow="M", commodity="Test",
+                        hs_code="0000", value_usd=0, quantity=0)
+        assert t.value_usd == 0
+        assert t.quantity == 0
+
+    def test_large_trade_value(self):
+        """Very large USD values (billion+) should work."""
+        t = TradeSignal(reporter="CHN", flow="X", commodity="Electronics",
+                        hs_code="8542", value_usd=50_000_000_000)
+        assert t.value_usd == 50_000_000_000
+
+
+# ── Edge Cases: MarketPulse ──
+
+
+class TestMarketPulseEdgeCases:
+    def test_with_trade_signals(self):
+        """MarketPulse with trade_signals populated."""
+        ts = TradeSignal(reporter="JPN", flow="M", commodity="Rice",
+                         hs_code="1006", value_usd=100)
+        p = MarketPulse(trade_signals=[ts], cpi_change=-2.0)
+        assert len(p.trade_signals) == 1
+        assert p.cpi_change == -2.0
+
+    def test_serialization(self):
+        """MarketPulse must serialize to JSON cleanly."""
+        f = FreightSignal(index=3000, change_pct=12.0, source="fbx",
+                          date="2026-03")
+        p = MarketPulse(freight=f, cpi_change=5.5, trade_signals=[])
+        d = p.model_dump()
+        j = json.dumps(d)
+        parsed = json.loads(j)
+        assert parsed["freight"]["index"] == 3000
+        assert parsed["cpi_change"] == 5.5
