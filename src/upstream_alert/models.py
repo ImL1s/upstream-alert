@@ -34,7 +34,7 @@ class RiskLevel(str, Enum):
 class PriceSignal(BaseModel):
     """A single economic indicator data point."""
 
-    source: str = Field(description="Data source (fred, worldbank, comtrade)")
+    source: str = Field(description="Data source (yahoo, fred, worldbank, comtrade)")
     period: str = Field(description="Time period (e.g. 2026-01)")
     category: str = Field(description="Signal category (CPI, PPI, trade)")
     index_value: float = Field(default=0.0, description="Raw index value")

@@ -149,7 +149,7 @@ class RiskEngine:
             except Exception as e:
                 errors.append(f"FRED: {e}")
 
-        # World Bank (free fallback)
+        # World Bank CPI (only if no price data from Yahoo or FRED)
         if not signals:
             try:
                 from upstream_alert.sources import worldbank

@@ -22,12 +22,18 @@ logger = logging.getLogger(__name__)
 _TIMEOUT_SECONDS = 10
 
 # item keyword → Yahoo Finance ticker
+# Supports both English and CJK (zh-TW) keywords
 TICKER_MAP: dict[str, str] = {
     "copper": "HG=F",
+    "銅": "HG=F",
     "aluminum": "ALI=F",
+    "鋁": "ALI=F",
     "soybean": "ZS=F",
+    "黃豆": "ZS=F",
     "cotton": "CT=F",
+    "棉": "CT=F",
     "coffee": "KC=F",
+    "咖啡": "KC=F",
 }
 
 
@@ -47,7 +53,7 @@ def fetch_daily_prices(
     """Fetch daily commodity futures prices.
 
     Args:
-        item: Item name or keyword (e.g. "copper", "咖啡豆")
+        item: Item name or keyword (e.g. "copper", "咖啡豆", "黃豆")
         days: Number of trading days to retrieve
 
     Returns:
