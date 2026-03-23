@@ -59,7 +59,7 @@ class RiskEngine:
         sources_used: list[str] = []
 
         # ── Collect data ──
-        price_signals = self._collect_prices(country, errors, sources_used)
+        price_signals = self._collect_prices(country, errors, sources_used, item=item)
         news_signals = self._collect_news(item, country, errors, sources_used)
         freight = self._collect_freight(errors, sources_used)
         trade_signals = self._collect_trade(country, item, errors, sources_used)
@@ -111,9 +111,24 @@ class RiskEngine:
 
     def _collect_prices(
         self, country: str, errors: list[str], sources: list[str],
+        item: str = "",
     ) -> list[dict[str, Any]]:
-        """Collect price signals (CPI) from FRED and World Bank."""
+        """Collect price signals (CPI + commodity) from Yahoo Finance, FRED, and World Bank."""
         signals: list[dict[str, Any]] = []
+
+        # Yahoo Finance (daily commodity futures, no key needed)
+        if item:
+            try:
+                from upstream_alert.sources import yahoo_finance
+
+                records = yahoo_finance.fetch_daily_prices(item, days=30)
+                signals.extend(
+                    s.model_dump() for s in yahoo_finance.to_signals(records)
+                )
+                if records:
+                    sources.append("yahoo_finance")
+            except Exception as e:
+                errors.append(f"YahooFinance: {e}")
 
         # FRED
         if self._fred_key:

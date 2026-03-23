@@ -6,7 +6,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![PyPI](https://img.shields.io/pypi/v/upstream-alert.svg)](https://pypi.org/project/upstream-alert/)
 
-**upstream-alert** is an AI agent skill that monitors supply chain risks in real-time. It aggregates data from **6 global sources**, scores risk (0–100), and generates AI-powered analysis — all callable as a single tool by your agent.
+**upstream-alert** is an AI agent skill that monitors supply chain risks in real-time. It aggregates data from **7 global sources**, scores risk (0–100), and generates AI-powered analysis — all callable as a single tool by your agent.
 
 ```
 User → "Is it safe to order coffee beans from Brazil right now?"
@@ -14,8 +14,9 @@ User → "Is it safe to order coffee beans from Brazil right now?"
 Agent → [calls upstream-alert]
      → 🟡 Coffee Beans (BR) — Score: 52/100 [MEDIUM]
        📊 CPI pressure moderate at 4.2% YoY.
+       ☕ Coffee spot price $5.62/lb (+3.3% MoM).
        🚢 Freight rates down 3.1% — favorable for importers.
-       📰 2 disruption signals detected in GDELT news feed.
+       📰 2 disruption signals detected in NewsData feed.
        💡 Recommendation: Proceed with caution, consider hedging.
 ```
 
@@ -26,13 +27,14 @@ Traditional supply chain monitoring requires humans to check dashboards, read ne
 ```mermaid
 graph LR
     A[🤖 AI Agent] -->|"check_risk('coffee', 'BR')"| B[upstream-alert]
+    B --> B1[Yahoo Finance]
     B --> C[FRED API]
-    B --> D[GDELT News]
+    B --> D[Commodities-API]
     B --> E[UN Comtrade]
     B --> F[World Bank]
     B --> G[Freightos FBX]
     B --> H[NewsData.io]
-    C & D & E & F & G & H --> I[Risk Engine]
+    B1 & C & D & E & F & G & H --> I[Risk Engine]
     I -->|Score + Analysis| J[Gemini AI]
     J -->|Structured Response| A
 ```
@@ -90,7 +92,7 @@ result = check_risk("coffee", country="BR")
 print(result.score)       # 52
 print(result.level)       # RiskLevel.MEDIUM
 print(result.ai_summary)    # "CPI pressure moderate at 4.2%..."
-print(result.sources_used)  # ['fred', 'gdelt', 'fbx']
+print(result.sources_used)  # ['fred', 'commodities_api', 'newsdata']
 ```
 
 ### As a CLI Tool
@@ -158,15 +160,29 @@ if risk.score > 60:
 
 | Source | Key Required | Free Tier | Data | Get Key |
 |--------|:---:|-----------|------|:---:|
-| **GDELT** | ❌ | Unlimited | Global news events | — |
+| **Yahoo Finance** | ❌ | Unlimited | Daily commodity futures (copper, aluminum, soybean, cotton, coffee) | — |
 | **World Bank** | ❌ | Unlimited | Economic indicators | — |
-| **FRED** | `FRED_API_KEY` | 120 req/min | CPI, PPI | [申請](https://fred.stlouisfed.org/docs/api/api_key.html) |
+| **FRED** | `FRED_API_KEY` | 120 req/min | CPI, PPI, commodity prices | [申請](https://fred.stlouisfed.org/docs/api/api_key.html) |
+| **Commodities-API** | `COMMODITIES_API_KEY` | 100 req/month | Real-time commodity prices | [申請](https://commodities-api.com/) |
 | **UN Comtrade** | `COMTRADE_API_KEY` | 500 req/day | Trade volumes | [申請](https://comtradeplus.un.org/) |
 | **NewsData.io** | `NEWSDATA_API_KEY` | 200 req/day | News + sentiment | [申請](https://newsdata.io/register) |
 | **Gemini AI** | `GEMINI_API_KEY` | 15 RPM | AI analysis | [申請](https://aistudio.google.com/apikey) |
 | **Freightos FBX** | `FBX_API_KEY` | Paid | Freight rates | [申請](https://terminal.freightos.com/fbx-api/) |
 
-> 💡 **Zero-key start:** GDELT + World Bank work without any API key. Add `GEMINI_API_KEY` for AI-powered analysis.
+> 💡 **Zero-key start:** Yahoo Finance and World Bank work without any API key. Add `GEMINI_API_KEY` for AI-powered analysis.
+
+## 📦 Supported Item Categories (20 items)
+
+| Category | Examples |
+|----------|----------|
+| 建材 (Construction) | 鋼筋, 合板, 水泥 |
+| 機電 (Electrical) | 電線電纜 |
+| 能源 (Energy) | 柴油, 汽油, 天然氣 |
+| 食品原料 (Food) | 黃豆, 麵粉, 棕櫚油, 砂糖, 咖啡豆 |
+| 電子零件 (Electronics) | 晶片 MCU, 被動元件 |
+| 包材 (Packaging) | 瓦楞紙箱, PE 膜 |
+| 化工 (Chemicals) | 塑膠粒, 工業酒精 |
+| 紡織 (Textiles) | 棉紗, 滌綸纖維 |
 
 ## 📊 Risk Scoring
 
@@ -193,8 +209,8 @@ upstream-alert/
 │   ├── models.py         ← Pydantic response models
 │   ├── cli.py            ← Click CLI interface
 │   └── sources/          ← Pluggable data adapters
-│       ├── fred.py       ← CPI/PPI (FRED)
-│       ├── gdelt.py      ← News events (GDELT)
+│       ├── fred.py       ← CPI/PPI/Commodity prices (FRED)
+│       ├── commodity.py  ← Real-time prices (Commodities-API)
 │       ├── comtrade.py   ← Trade data (UN)
 │       ├── worldbank.py  ← Economic indicators
 │       ├── newsdata.py   ← News sentiment

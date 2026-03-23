@@ -28,6 +28,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+yahoo = ["yfinance>=0.2.36"]
 dev = [
     "pytest>=7.0",
     "pytest-cov",
