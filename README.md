@@ -238,6 +238,12 @@ pip install -e ".[dev]"
 pytest  # 155+ tests
 ```
 
+---
+
+## Support
+
+If this project saved you some time, you can [buy me a coffee](https://buymeacoffee.com/iml1s).
+
 ## 📄 License
 
 MIT — use freely in personal and commercial projects.
